@@ -9,13 +9,15 @@ Reduce AI API costs. Works with Kiro, Claude Code, or any LLM-powered agent.
 - Model routing: scores prompt complexity, sends simple tasks to cheaper models
 - Output budgeting: enforces max output token limits per request
 
-## Install
+## Python library
+
+Requires Python 3.12+.
 
 ```bash
+git clone https://github.com/alivcor/bref.git
+cd bref
 pip install -e ".[dev]"
 ```
-
-## Usage
 
 ```python
 from bref import Bref, BrefConfig
@@ -33,4 +35,56 @@ result = bref.optimize(
     prompt="Your long prompt here...",
     model="claude-sonnet-4-20250514",
 )
+```
+
+## VS Code / Kiro extension
+
+The extension lives in `vscode-bref/`. It calls into the Python library, so you need bref installed in a Python environment first.
+
+### Setup
+
+1. Install the Python library (see above).
+
+2. Build the extension:
+
+```bash
+cd vscode-bref
+npm install
+npm run compile
+```
+
+3. Install in VS Code or Kiro:
+   - Open the command palette (`Cmd+Shift+P`)
+   - Run "Developer: Install Extension from Location..."
+   - Select the `vscode-bref` folder
+
+Alternatively, package it as a `.vsix`:
+
+```bash
+npm install -g @vscode/vsce
+cd vscode-bref
+vsce package
+```
+
+Then install the `.vsix` via the command palette ("Extensions: Install from VSIX...").
+
+### Configuration
+
+Open Settings and search for "Bref":
+
+- `bref.pythonPath`: path to the Python interpreter with bref installed (default: `python3`)
+- `bref.compressionRatio`: target compression ratio, 0.1 = aggressive, 1.0 = no compression (default: `0.5`)
+
+### Commands
+
+- `Bref: Compress Selection`: compresses the selected text in the active editor
+- `Bref: Show Stats`: shows tokens saved this session
+
+The status bar shows a running total of tokens saved. The sidebar panel under the Bref icon shows compression history and averages.
+
+## Running tests
+
+```bash
+pip install -e ".[dev]"
+pytest
 ```
