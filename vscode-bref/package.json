@@ -60,7 +60,7 @@
         "bref.pythonPath": {
           "type": "string",
           "default": "python3",
-          "description": "Path to Python interpreter with bref installed"
+          "description": "Path to Python interpreter with bref installed. If using the bref venv, point to bref-project/.venv/bin/python3"
         }
       }
     }
