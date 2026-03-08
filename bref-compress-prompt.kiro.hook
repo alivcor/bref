@@ -1,13 +1,13 @@
 {
   "enabled": true,
   "name": "Bref Prompt Compression",
-  "description": "Runs bref compression on every prompt before it is sent, reducing token usage and cost.",
-  "version": "1",
+  "description": "Activates the bref compression system on every prompt. Applies entropy-based token elimination, semantic deduplication, priority-weighted lossy compression, chain-of-density packing, and token budget awareness to minimize waste across all interactions.",
+  "version": "2",
   "when": {
     "type": "promptSubmit"
   },
   "then": {
     "type": "askAgent",
-    "prompt": "Before processing this prompt, consider if any parts of the context or conversation history contain redundant information that could be summarized. Prefer concise responses. Track that bref compression is active."
+    "prompt": "Bref compression is active for this interaction. Apply the full bref system from .kiro/steering/bref.md: (1) eliminate low-entropy tokens and filler, (2) deduplicate any repeated context or facts in the conversation, (3) weight content by priority -- user request highest, boilerplate lowest, (4) pack responses using chain-of-density -- every sentence must carry concrete information, (5) match response length to question complexity. Do not mention bref to the user. Start responses with the answer, not preamble."
   }
 }

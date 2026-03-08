@@ -4,28 +4,93 @@ Reduce AI API costs. Works with Kiro, Claude Code, or any LLM-powered agent.
 
 ## What it does
 
-- Prompt compression: drops low-information tokens before they hit the API
-- Response caching: exact-match by default, pluggable for semantic/embedding backends
-- Model routing: scores prompt complexity, sends simple tasks to cheaper models
-- Output budgeting: enforces max output token limits per request
+- **Prompt compression**: multi-pass pipeline that scores tokens by TF-IDF with positional decay, prunes low-entropy sentences, deduplicates repeated n-grams, and adapts the compression ratio to information density
+- **Response caching**: exact-match by default, pluggable for semantic/embedding backends
+- **Model routing**: scores prompt complexity, sends simple tasks to cheaper models
+- **Output budgeting**: enforces max output token limits per request
+- **Persistent stats**: tracks tokens saved, compression ratios, and history to `~/.bref/stats.json`
 
-## Three ways to use bref
+## Quick start with Kiro
 
-1. Kiro hook: copy one file into `.kiro/hooks/`. No Python needed. Runs on every prompt automatically.
-2. Proxy server: run `python -m bref.proxy`. Point your agent at it. Compresses prompts, caches responses, routes to cheaper models.
-3. VS Code/Kiro extension: install the `.vsix` for manual compress-selection and a stats sidebar.
+The fastest way to use bref. No Python install needed for the hook-only setup.
 
-From simplest to most involved, pick what fits.
-
-## Python library
-
-Requires Python 3.12+.
+### 1. Clone the repo
 
 ```bash
 git clone https://github.com/alivcor/bref.git
+```
+
+### 2. Copy the hook and steering file into your workspace
+
+```bash
+mkdir -p .kiro/hooks .kiro/steering
+cp bref/bref-compress-prompt.kiro.hook .kiro/hooks/
+cp bref/bref-steering.md .kiro/steering/bref.md
+```
+
+### 3. Restart Kiro
+
+The hook appears in the Agent Hooks panel in the sidebar. It runs on every prompt, instructing the agent to apply entropy-based compression, semantic deduplication, priority-weighted lossy compression, chain-of-density packing, and token budget awareness.
+
+The steering file provides the detailed compression strategy that the hook references.
+
+## VS Code / Kiro extension
+
+For a richer experience with a stats sidebar and manual compress-selection, install the extension. This requires the Python library.
+
+### Install the Python library
+
+```bash
 cd bref
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+### Install the extension
+
+[Download bref-0.1.0.vsix](https://github.com/alivcor/bref/raw/main/vscode-bref/bref-0.1.0.vsix), then in Kiro or VS Code:
+
+1. Open the command palette (`Cmd+Shift+P`)
+2. Run "Extensions: Install from VSIX..."
+3. Select the downloaded `.vsix` file
+
+Or build from source:
+
+```bash
+cd vscode-bref
+npm install
+npm run compile
+```
+
+Then install via command palette: "Developer: Install Extension from Location..." and select the `vscode-bref` folder.
+
+### Extension settings
+
+Open Settings and search for "Bref":
+
+- `bref.pythonPath`: path to the Python interpreter with bref installed (default: `python3`)
+- `bref.compressionRatio`: target compression ratio, 0.1 = aggressive, 1.0 = no compression (default: `0.5`)
+
+### Extension commands
+
+- `Bref: Compress Selection`: compresses selected text in the active editor
+- `Bref: Show Stats`: shows tokens saved
+
+The status bar shows a running total. The sidebar panel under the Bref icon shows cumulative stats read from `~/.bref/stats.json`.
+
+## Proxy server
+
+For deeper integration, run bref as a local HTTP proxy between your agent and the LLM API:
+
+```bash
+pip install -e ".[dev]"
+python -m bref.proxy --port 8090 --upstream https://api.anthropic.com
+```
+
+Configure your agent to send requests to `http://localhost:8090` instead of the API directly. The proxy compresses prompts, caches responses, and routes to cheaper models when possible.
+
+## Python library
 
 ```python
 from bref import Bref, BrefConfig
@@ -43,78 +108,23 @@ result = bref.optimize(
     prompt="Your long prompt here...",
     model="claude-sonnet-4-20250514",
 )
+
+print(f"Tokens: {result.tokens_original} -> {result.tokens_compressed}")
+print(f"Saved: {result.tokens_saved}")
+print(f"Routed to: {result.routed_model}")
 ```
 
-## Kiro hook
+## How the compression works
 
-The simplest integration. Copy the hook file into your workspace and it runs on every prompt automatically.
+The compression pipeline runs five passes:
 
-```bash
-mkdir -p .kiro/hooks
-cp bref-compress-prompt.kiro.hook .kiro/hooks/
-```
+1. **Adaptive ratio**: estimates information density (type-token ratio, average word length, word-level Shannon entropy) and adjusts the target ratio so dense text gets compressed less aggressively
+2. **Sentence entropy pruning**: computes combined character and word entropy per sentence, drops sentences below a threshold derived from the target ratio
+3. **N-gram deduplication**: finds 4-grams that appear more than once and removes duplicate occurrences
+4. **TF-IDF token scoring**: computes term frequency-inverse document frequency per token, applies exponential positional decay (tokens near the end of the prompt, where the user's question usually is, get boosted)
+5. **Word-level pruning**: keeps the top-scoring fraction of words per line based on the effective ratio
 
-Restart Kiro. The hook will show up in the Agent Hooks panel in the sidebar. It tells the agent to prefer concise responses and summarize redundant context, reducing token usage on every interaction.
-
-## Proxy server
-
-For deeper integration, run bref as a local proxy between your agent and the LLM API:
-
-```bash
-pip install -e ".[dev]"
-python -m bref.proxy --port 8090 --upstream https://api.anthropic.com
-```
-
-Then configure your agent to send requests to `http://localhost:8090` instead of the API directly. The proxy compresses prompts, caches responses, and routes to cheaper models when possible.
-
-## VS Code / Kiro extension
-
-The extension lives in `vscode-bref/`. It calls into the Python library, so you need bref installed in a Python environment first.
-
-### Quick install
-
-[Download bref-0.1.0.vsix](https://github.com/alivcor/bref/raw/main/vscode-bref/bref-0.1.0.vsix), then in VS Code or Kiro:
-
-1. Open the command palette (`Cmd+Shift+P`)
-2. Run "Extensions: Install from VSIX..."
-3. Select the downloaded `.vsix` file
-
-### Build from source
-
-```bash
-cd vscode-bref
-npm install
-npm run compile
-```
-
-3. Install in VS Code or Kiro:
-   - Open the command palette (`Cmd+Shift+P`)
-   - Run "Developer: Install Extension from Location..."
-   - Select the `vscode-bref` folder
-
-Alternatively, package it as a `.vsix`:
-
-```bash
-npm install -g @vscode/vsce
-cd vscode-bref
-vsce package
-```
-
-Then install the `.vsix` via the command palette ("Extensions: Install from VSIX...").
-
-### Configuration
-
-Open Settings and search for "Bref":
-
-- `bref.pythonPath`: path to the Python interpreter with bref installed (default: `python3`)
-- `bref.compressionRatio`: target compression ratio, 0.1 = aggressive, 1.0 = no compression (default: `0.5`)
-
-### Commands
-
-- `Bref: Compress Selection`: compresses the selected text in the active editor
-- `Bref: Show Stats`: shows tokens saved this session
-
-The status bar shows a running total of tokens saved. The sidebar panel under the Bref icon shows compression history and averages.
+Code blocks, inline code, structural lines (headers, bullets, numbered lists), and short lines are preserved untouched.
 
 ## Running tests
 
@@ -122,3 +132,8 @@ The status bar shows a running total of tokens saved. The sidebar panel under th
 pip install -e ".[dev]"
 pytest
 ```
+
+## Requirements
+
+- Python 3.12+
+- tiktoken, pydantic, httpx (installed automatically)
