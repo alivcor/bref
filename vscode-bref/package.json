@@ -9,6 +9,11 @@
   "categories": [
     "Other"
   ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/alivcor/bref"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
