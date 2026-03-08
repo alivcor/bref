@@ -99,9 +99,9 @@ async function recordPromptCompression(text?: string): Promise<void> {
 }
 
 /**
- * Touches ~/.bref/activity.log via Node fs so the extension poll
- * detects prompt activity. Replaces the old runCommand hook that
- * was prompting users for shell approval on every message.
+ * Appends a timestamp to ~/.bref/activity.log so the poll loop
+ * picks up prompt activity. Creates ~/.bref on first call only.
+ * All fs, no shell commands.
  */
 function touchActivityLog(): void {
   try {
@@ -109,12 +109,7 @@ function touchActivityLog(): void {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    const now = new Date();
-    if (fs.existsSync(ACTIVITY_LOG)) {
-      fs.utimesSync(ACTIVITY_LOG, now, now);
-    } else {
-      fs.writeFileSync(ACTIVITY_LOG, "", "utf-8");
-    }
+    fs.appendFileSync(ACTIVITY_LOG, `${Date.now()}\n`, "utf-8");
   } catch {
     // non-critical, stats just won't update this cycle
   }
@@ -127,10 +122,6 @@ function touchActivityLog(): void {
 function watchPromptActivity(context: vscode.ExtensionContext): void {
   let lastMtime = 0;
   try {
-    const dir = path.dirname(ACTIVITY_LOG);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
     if (fs.existsSync(ACTIVITY_LOG)) {
       lastMtime = fs.statSync(ACTIVITY_LOG).mtimeMs;
     }
