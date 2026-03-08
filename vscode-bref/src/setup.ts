@@ -29,25 +29,8 @@ const HOOK_CONTENT = JSON.stringify(
   2
 );
 
-// Stats tracking hook -- touches activity.log so the extension poll
-// can detect prompt submissions and update the stats panel.
-// Uses touch (no output) to avoid noise in the chat.
-const STATS_HOOK_CONTENT = JSON.stringify(
-  {
-    enabled: true,
-    name: "Bref Stats Tracker",
-    description:
-      "Signals the Bref extension on each prompt so the stats panel updates.",
-    version: "3",
-    when: { type: "promptSubmit" },
-    then: {
-      type: "runCommand",
-      command: `touch ${BREF_DIR}/activity.log`,
-    },
-  },
-  null,
-  2
-);
+// Stats hook removed -- the extension now touches activity.log internally
+// via Node fs in recordPromptCompression, avoiding the runCommand prompt.
 
 const STEERING_CONTENT = `---
 inclusion: auto
@@ -159,17 +142,11 @@ export function ensureBrefSetup(): string[] {
       created.push(".kiro/hooks/bref-compress-prompt.kiro.hook");
     }
 
-    // Stats hook -- touches activity.log so the extension can track prompts.
-    // Always overwrite to upgrade from older versions that had noisy commands.
+    // Clean up the old stats hook if it exists (it caused runCommand prompts)
     const statsHookFile = path.join(hooksDir, "bref-stats-track.kiro.hook");
-    const statsHookExisted = fs.existsSync(statsHookFile);
-    const dir = path.dirname(statsHookFile);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    fs.writeFileSync(statsHookFile, STATS_HOOK_CONTENT, "utf-8");
-    if (!statsHookExisted) {
-      created.push(".kiro/hooks/bref-stats-track.kiro.hook");
+    if (fs.existsSync(statsHookFile)) {
+      fs.unlinkSync(statsHookFile);
+      created.push("removed bref-stats-track.kiro.hook");
     }
 
     const steeringFile = path.join(steeringDir, "bref.md");

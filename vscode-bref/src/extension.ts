@@ -67,8 +67,12 @@ export function activate(context: vscode.ExtensionContext): void {
 /**
  * Called via command when the bref hook fires on a prompt.
  * Accepts optional text to measure compression against.
+ * Also touches the activity log so the poll loop picks up the event
+ * without needing a separate runCommand hook.
  */
 async function recordPromptCompression(text?: string): Promise<void> {
+  touchActivityLog();
+
   if (text && text.length > 0) {
     try {
       const result = await compress(text);
@@ -87,8 +91,29 @@ async function recordPromptCompression(text?: string): Promise<void> {
 }
 
 /**
- * Watches the activity log file that the bref-stats-track hook touches
- * on every prompt submission. Detects mtime changes to trigger stats
+ * Touches ~/.bref/activity.log via Node fs so the extension poll
+ * detects prompt activity. Replaces the old runCommand hook that
+ * was prompting users for shell approval on every message.
+ */
+function touchActivityLog(): void {
+  try {
+    const dir = path.dirname(ACTIVITY_LOG);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const now = new Date();
+    if (fs.existsSync(ACTIVITY_LOG)) {
+      fs.utimesSync(ACTIVITY_LOG, now, now);
+    } else {
+      fs.writeFileSync(ACTIVITY_LOG, "", "utf-8");
+    }
+  } catch {
+    // non-critical, stats just won't update this cycle
+  }
+}
+
+/**
+ * Polls ~/.bref/activity.log for mtime changes to trigger stats
  * updates. Also watches steering and hook files.
  */
 function watchPromptActivity(context: vscode.ExtensionContext): void {

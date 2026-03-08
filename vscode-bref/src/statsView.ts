@@ -207,10 +207,26 @@ export class StatsViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
+  private _updateBadge(): void {
+    if (!this._view) {
+      return;
+    }
+    const saved = this._sessionStats.totalTokensSaved;
+    if (saved > 0) {
+      const label = saved >= 1000
+        ? `${(saved / 1000).toFixed(1)}K tokens saved`
+        : `${saved} tokens saved`;
+      this._view.badge = { value: saved, tooltip: label };
+    } else {
+      this._view.badge = undefined;
+    }
+  }
+
   private _updateHtml(): void {
     if (!this._view) {
       return;
     }
+    this._updateBadge();
 
     const s = this._sessionStats;
     const avgRatio =
