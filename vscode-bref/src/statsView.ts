@@ -54,15 +54,48 @@ export class StatsViewProvider implements vscode.WebviewViewProvider {
     this._refreshFromDisk();
   }
 
-  recordCompression(tokensSaved: number, ratio: number): void {
+  recordCompression(
+    tokensSaved: number,
+    ratio: number,
+    tokensOriginal: number = 0,
+    tokensCompressed: number = 0
+  ): void {
     this._sessionStats.totalTokensSaved += tokensSaved;
     this._sessionStats.totalCompressions += 1;
+    this._sessionStats.totalTokensOriginal += tokensOriginal;
+    this._sessionStats.totalTokensCompressed += tokensCompressed;
     this._sessionStats.history.push({
       timestamp: Date.now(),
       tokensSaved,
       ratio,
     });
+    this._persistToDisk();
     this._updateHtml();
+  }
+
+  private _persistToDisk(): void {
+    try {
+      const dir = path.dirname(STATS_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const s = this._sessionStats;
+      const persistent: PersistentStats = {
+        total_tokens_saved: s.totalTokensSaved,
+        total_compressions: s.totalCompressions,
+        total_tokens_original: s.totalTokensOriginal,
+        total_tokens_compressed: s.totalTokensCompressed,
+        history: s.history.slice(-100).map((h) => ({
+          tokens_saved: h.tokensSaved,
+          effective_ratio: h.ratio,
+          sentences_dropped: 0,
+          ngram_dedup_count: 0,
+        })),
+      };
+      fs.writeFileSync(STATS_FILE, JSON.stringify(persistent, null, 2));
+    } catch {
+      // best-effort
+    }
   }
 
   get stats(): SessionStats {

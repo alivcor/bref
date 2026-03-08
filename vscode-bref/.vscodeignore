@@ -1,4 +1,7 @@
 src/**
+out/**
 node_modules/**
 .vscode/**
 tsconfig.json
+esbuild.js
+dist/*.js.map

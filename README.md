@@ -36,16 +36,7 @@ The steering file provides the detailed compression strategy that the hook refer
 
 ## VS Code / Kiro extension
 
-For a richer experience with a stats sidebar and manual compress-selection, install the extension. This requires the Python library.
-
-### Install the Python library
-
-```bash
-cd bref
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
+Install the extension for a stats sidebar and manual compress-selection. No Python needed -- the compression engine runs natively in TypeScript.
 
 ### Install the extension
 
@@ -69,7 +60,6 @@ Then install via command palette: "Developer: Install Extension from Location...
 
 Open Settings and search for "Bref":
 
-- `bref.pythonPath`: path to the Python interpreter with bref installed (default: `python3`)
 - `bref.compressionRatio`: target compression ratio, 0.1 = aggressive, 1.0 = no compression (default: `0.5`)
 
 ### Extension commands

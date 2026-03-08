@@ -71,7 +71,12 @@ async function compressSelection(): Promise<void> {
     const ratio = result.tokens_original > 0
       ? result.tokens_compressed / result.tokens_original
       : 1;
-    statsProvider.recordCompression(result.tokens_saved, ratio);
+    statsProvider.recordCompression(
+      result.tokens_saved,
+      ratio,
+      result.tokens_original,
+      result.tokens_compressed
+    );
 
     vscode.window.showInformationMessage(
       `Compressed: ${result.tokens_original} -> ${result.tokens_compressed} tokens (${result.tokens_saved} saved)`
