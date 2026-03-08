@@ -9,6 +9,14 @@ Reduce AI API costs. Works with Kiro, Claude Code, or any LLM-powered agent.
 - Model routing: scores prompt complexity, sends simple tasks to cheaper models
 - Output budgeting: enforces max output token limits per request
 
+## Three ways to use bref
+
+1. Kiro hook: copy one file into `.kiro/hooks/`. No Python needed. Runs on every prompt automatically.
+2. Proxy server: run `python -m bref.proxy`. Point your agent at it. Compresses prompts, caches responses, routes to cheaper models.
+3. VS Code/Kiro extension: install the `.vsix` for manual compress-selection and a stats sidebar.
+
+From simplest to most involved, pick what fits.
+
 ## Python library
 
 Requires Python 3.12+.
