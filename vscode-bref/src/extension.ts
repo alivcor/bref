@@ -11,6 +11,7 @@ const ACTIVITY_LOG = path.join(os.homedir(), ".bref", "activity.log");
 let statusBarItem: vscode.StatusBarItem;
 let statsProvider: StatsViewProvider;
 let sessionTokensSaved = 0;
+const processedLogEntries = new Set<string>();
 
 export function activate(context: vscode.ExtensionContext): void {
   statsProvider = new StatsViewProvider(context.extensionUri);
@@ -74,6 +75,13 @@ async function recordPromptCompression(text?: string): Promise<void> {
   touchActivityLog();
 
   if (text && text.length > 0) {
+    // Write prompt text so the poll loop can measure real compression
+    try {
+      const contextFile = path.join(path.dirname(ACTIVITY_LOG), "last_prompt.txt");
+      fs.writeFileSync(contextFile, text, "utf-8");
+    } catch {
+      // non-critical
+    }
     try {
       const result = await compress(text);
       sessionTokensSaved += result.tokens_saved;
@@ -138,9 +146,42 @@ function watchPromptActivity(context: vscode.ExtensionContext): void {
       const mtime = fs.statSync(ACTIVITY_LOG).mtimeMs;
       if (mtime > lastMtime) {
         lastMtime = mtime;
-        statsProvider.recordSteeringActive();
-        sessionTokensSaved = statsProvider.stats.totalTokensSaved;
-        updateStatusBar();
+        const logContent = fs.readFileSync(ACTIVITY_LOG, "utf-8").trim();
+        const entries = logContent.split("\n").filter(Boolean);
+        const newEntries = entries.filter(
+          (e) => !processedLogEntries.has(e)
+        );
+        if (newEntries.length > 0) {
+          for (const entry of newEntries) {
+            processedLogEntries.add(entry);
+          }
+          // Read the most recent prompt context if available
+          const contextFile = path.join(path.dirname(ACTIVITY_LOG), "last_prompt.txt");
+          if (fs.existsSync(contextFile)) {
+            try {
+              const promptText = fs.readFileSync(contextFile, "utf-8");
+              if (promptText.trim().length > 0) {
+                compress(promptText).then((result) => {
+                  sessionTokensSaved += result.tokens_saved;
+                  statsProvider.recordPromptActivity(
+                    result.tokens_original,
+                    result.tokens_compressed
+                  );
+                  updateStatusBar();
+                }).catch(() => {
+                  statsProvider.recordSteeringActive();
+                  updateStatusBar();
+                });
+                return;
+              }
+            } catch {
+              // fall through to estimate
+            }
+          }
+          statsProvider.recordSteeringActive();
+          sessionTokensSaved = statsProvider.stats.totalTokensSaved;
+          updateStatusBar();
+        }
       }
     } catch {
       // file might not exist yet

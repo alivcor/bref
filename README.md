@@ -1,8 +1,14 @@
-# Bref
+# Bref: AI Prompt Compression and Token Cost Optimizer
 
-Reduce AI API costs. Works with Kiro, Claude Code, or any LLM-powered agent.
+Reduce LLM API costs by 40-60%. Bref compresses prompts, caches responses, and routes requests to cheaper models. Works with Kiro, Claude Code, Copilot, GPT, or any LLM-powered agent.
 
-## What it does
+By [Abhinandan Dubey](https://alivcor.github.io)
+
+## Why Bref
+
+Every token you send to an LLM API costs money. Long system prompts, repeated context, and verbose instructions inflate your bill without improving output quality. Bref sits between your agent and the API, compressing what goes in and caching what comes back.
+
+## Features
 
 - **Prompt compression**: multi-pass pipeline that scores tokens by TF-IDF with positional decay, prunes low-entropy sentences, deduplicates repeated n-grams, and adapts the compression ratio to information density
 - **Response caching**: exact-match by default, pluggable for semantic/embedding backends
@@ -36,11 +42,19 @@ The hook appears in the Agent Hooks panel in the sidebar. It runs on every promp
 
 The steering file provides the detailed compression strategy that the hook references.
 
-## VS Code / Kiro extension
+## VS Code / Kiro Extension
 
-Install the extension for a stats sidebar and manual compress-selection. No Python needed -- the compression engine runs natively in TypeScript.
+Install the extension for a stats sidebar and manual compress-selection. No Python needed. The compression engine runs natively in TypeScript.
 
-### Install the extension
+### Install from Marketplace
+
+Search for "Bref" in the VS Code or Kiro extensions panel, or:
+
+```
+ext install abhinandandubey.vscode-bref
+```
+
+### Install from VSIX
 
 [Download vscode-bref-0.2.0.vsix](https://github.com/alivcor/bref/raw/main/vscode-bref/vscode-bref-0.2.0.vsix), then in Kiro or VS Code:
 
@@ -56,8 +70,6 @@ npm install
 npm run compile
 ```
 
-Then install via command palette: "Developer: Install Extension from Location..." and select the `vscode-bref` folder.
-
 ### Extension settings
 
 Open Settings and search for "Bref":
@@ -71,26 +83,18 @@ Open Settings and search for "Bref":
 
 The status bar shows a running total. The sidebar panel under the Bref icon shows cumulative stats read from `~/.bref/stats.json`.
 
-### How stats tracking works
-
-The extension creates one hook on activation:
-
-- `bref-compress-prompt` (askAgent): injects the compression steering into every prompt
-
-Stats are persisted to `~/.bref/stats.json`. The sidebar panel polls this file every 5 seconds and the status bar updates automatically. The "Bref steering active" log entry appears once per session to confirm the steering file is loaded.
-
-## Proxy server
+## Proxy Server
 
 For deeper integration, run bref as a local HTTP proxy between your agent and the LLM API:
 
 ```bash
 pip install -e ".[dev]"
-python -m bref.proxy --port 8090 --upstream https://api.anthropic.com
+python -m bref.proxy --upstream https://api.anthropic.com
 ```
 
-Configure your agent to send requests to `http://localhost:8090` instead of the API directly. The proxy compresses prompts, caches responses, and routes to cheaper models when possible.
+Configure your agent to send requests to localhost instead of the API directly. The proxy compresses prompts, caches responses, and routes to cheaper models when possible.
 
-## Python library
+## Python Library
 
 ```python
 from bref import Bref, BrefConfig
@@ -114,7 +118,7 @@ print(f"Saved: {result.tokens_saved}")
 print(f"Routed to: {result.routed_model}")
 ```
 
-## How the compression works
+## How the Compression Works
 
 The compression pipeline runs five passes:
 
@@ -126,7 +130,7 @@ The compression pipeline runs five passes:
 
 Code blocks, inline code, structural lines (headers, bullets, numbered lists), and short lines are preserved untouched.
 
-## Running tests
+## Running Tests
 
 ```bash
 pip install -e ".[dev]"
@@ -137,3 +141,7 @@ pytest
 
 - Python 3.12+
 - tiktoken, pydantic, httpx (installed automatically)
+
+## License
+
+MIT

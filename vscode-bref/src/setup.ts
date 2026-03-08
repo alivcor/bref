@@ -29,8 +29,23 @@ const HOOK_CONTENT = JSON.stringify(
   2
 );
 
-// Stats hook removed -- the extension now touches activity.log internally
-// via Node fs in recordPromptCompression, avoiding the runCommand prompt.
+// Stats tracking hook: touches activity.log and writes prompt context on each prompt.
+// Uses a lightweight shell command that completes instantly.
+const STATS_HOOK_CONTENT = JSON.stringify(
+  {
+    enabled: true,
+    name: "Bref Stats Tracker",
+    description: "Writes prompt activity to ~/.bref so the sidebar stats update in real time.",
+    version: "1.0.0",
+    when: { type: "promptSubmit" },
+    then: {
+      type: "runCommand",
+      command: "mkdir -p ~/.bref && echo bref_prompt_$(date +%s) >> ~/.bref/activity.log",
+    },
+  },
+  null,
+  2
+);
 
 const STEERING_CONTENT = `---
 inclusion: auto
@@ -142,11 +157,9 @@ export function ensureBrefSetup(): string[] {
       created.push(".kiro/hooks/bref-compress-prompt.kiro.hook");
     }
 
-    // Clean up the old stats hook if it exists (it caused runCommand prompts)
     const statsHookFile = path.join(hooksDir, "bref-stats-track.kiro.hook");
-    if (fs.existsSync(statsHookFile)) {
-      fs.unlinkSync(statsHookFile);
-      created.push("removed bref-stats-track.kiro.hook");
+    if (writeIfMissing(statsHookFile, STATS_HOOK_CONTENT)) {
+      created.push(".kiro/hooks/bref-stats-track.kiro.hook");
     }
 
     const steeringFile = path.join(steeringDir, "bref.md");
