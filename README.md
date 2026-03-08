@@ -20,7 +20,9 @@ The fastest way to use bref. No Python install needed for the hook-only setup.
 git clone https://github.com/alivcor/bref.git
 ```
 
-### 2. Copy the hook and steering file into your workspace
+### 2. Copy the hook and steering file into your workspace (optional)
+
+The VS Code extension auto-creates these on first activation. If you prefer to set them up manually:
 
 ```bash
 mkdir -p .kiro/hooks .kiro/steering
@@ -40,7 +42,7 @@ Install the extension for a stats sidebar and manual compress-selection. No Pyth
 
 ### Install the extension
 
-[Download bref-0.1.0.vsix](https://github.com/alivcor/bref/raw/main/vscode-bref/bref-0.1.0.vsix), then in Kiro or VS Code:
+[Download vscode-bref-0.1.0.vsix](https://github.com/alivcor/bref/raw/main/vscode-bref/vscode-bref-0.1.0.vsix), then in Kiro or VS Code:
 
 1. Open the command palette (`Cmd+Shift+P`)
 2. Run "Extensions: Install from VSIX..."
