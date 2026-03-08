@@ -1,6 +1,12 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
 import { compress } from "./bridge";
 import { StatsViewProvider } from "./statsView";
+import { ensureBrefSetup } from "./setup";
+
+const ACTIVITY_LOG = path.join(os.homedir(), ".bref", "activity.log");
 
 let statusBarItem: vscode.StatusBarItem;
 let statsProvider: StatsViewProvider;
@@ -41,6 +47,140 @@ export function activate(context: vscode.ExtensionContext): void {
       );
     })
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand("bref.recordPrompt", recordPromptCompression)
+  );
+
+  // Watch for prompt activity signals
+  watchPromptActivity(context);
+
+  // Bootstrap hook, steering, and ~/.bref if missing
+  const created = ensureBrefSetup();
+  if (created.length > 0) {
+    statsProvider.addLog(`Setup: created ${created.join(", ")}`, "info");
+  }
+
+  statsProvider.addLog("Bref extension activated", "info");
+}
+
+/**
+ * Called via command when the bref hook fires on a prompt.
+ * Accepts optional text to measure compression against.
+ */
+async function recordPromptCompression(text?: string): Promise<void> {
+  if (text && text.length > 0) {
+    try {
+      const result = await compress(text);
+      sessionTokensSaved += result.tokens_saved;
+      statusBarItem.text = `$(zap) Bref: ${sessionTokensSaved} saved`;
+      statsProvider.recordPromptActivity(
+        result.tokens_original,
+        result.tokens_compressed
+      );
+    } catch {
+      statsProvider.addLog("Prompt compression measurement failed", "info");
+    }
+  } else {
+    statsProvider.recordSteeringActive();
+  }
+}
+
+/**
+ * Watches the activity log file that the bref-stats-track hook writes to
+ * on every prompt submission. Also watches steering and hook files.
+ */
+function watchPromptActivity(context: vscode.ExtensionContext): void {
+  // Watch ~/.bref/activity.log for new entries from the hook
+  let lastLineCount = 0;
+  try {
+    const dir = path.dirname(ACTIVITY_LOG);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (fs.existsSync(ACTIVITY_LOG)) {
+      const content = fs.readFileSync(ACTIVITY_LOG, "utf-8");
+      lastLineCount = content.split("\n").filter(Boolean).length;
+    }
+  } catch {
+    // fine, will start from zero
+  }
+
+  const activityPoll = setInterval(() => {
+    try {
+      if (!fs.existsSync(ACTIVITY_LOG)) {
+        return;
+      }
+      const content = fs.readFileSync(ACTIVITY_LOG, "utf-8");
+      const lines = content.split("\n").filter(Boolean);
+      const newCount = lines.length;
+      if (newCount > lastLineCount) {
+        const newLines = lines.slice(lastLineCount);
+        for (const line of newLines) {
+          statsProvider.recordSteeringActive();
+        }
+        lastLineCount = newCount;
+        updateStatusBar();
+      }
+    } catch {
+      // file might not exist yet
+    }
+  }, 2000);
+
+  context.subscriptions.push({ dispose: () => clearInterval(activityPoll) });
+
+  // Watch workspace steering and hook files
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders) {
+    return;
+  }
+
+  for (const folder of workspaceFolders) {
+    const steeringPattern = new vscode.RelativePattern(
+      folder,
+      ".kiro/steering/bref.md"
+    );
+
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      steeringPattern,
+      false,
+      false,
+      false
+    );
+
+    watcher.onDidChange(() => {
+      statsProvider.addLog("Steering file updated", "steering");
+      updateStatusBar();
+    });
+
+    context.subscriptions.push(watcher);
+  }
+
+  for (const folder of workspaceFolders) {
+    const hookPattern = new vscode.RelativePattern(
+      folder,
+      ".kiro/hooks/bref-*.kiro.hook"
+    );
+
+    const hookWatcher = vscode.workspace.createFileSystemWatcher(
+      hookPattern,
+      false,
+      false,
+      false
+    );
+
+    hookWatcher.onDidChange(() => {
+      statsProvider.addLog("Bref hook configuration updated", "info");
+    });
+
+    context.subscriptions.push(hookWatcher);
+  }
+}
+
+function updateStatusBar(): void {
+  const s = statsProvider.stats;
+  sessionTokensSaved = s.totalTokensSaved;
+  statusBarItem.text = `$(zap) Bref: ${sessionTokensSaved} saved`;
 }
 
 async function compressSelection(): Promise<void> {
@@ -76,10 +216,6 @@ async function compressSelection(): Promise<void> {
       ratio,
       result.tokens_original,
       result.tokens_compressed
-    );
-
-    vscode.window.showInformationMessage(
-      `Compressed: ${result.tokens_original} -> ${result.tokens_compressed} tokens (${result.tokens_saved} saved)`
     );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
