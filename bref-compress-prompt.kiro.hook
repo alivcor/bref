@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Bref Prompt Compression",
+  "description": "Runs bref compression on every prompt before it is sent, reducing token usage and cost.",
+  "version": "1",
+  "when": {
+    "type": "promptSubmit"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Before processing this prompt, consider if any parts of the context or conversation history contain redundant information that could be summarized. Prefer concise responses. Track that bref compression is active."
+  }
+}

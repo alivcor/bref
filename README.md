@@ -37,6 +37,28 @@ result = bref.optimize(
 )
 ```
 
+## Kiro hook
+
+The simplest integration. Copy the hook file into your workspace and it runs on every prompt automatically.
+
+```bash
+mkdir -p .kiro/hooks
+cp bref-compress-prompt.kiro.hook .kiro/hooks/
+```
+
+Restart Kiro. The hook will show up in the Agent Hooks panel in the sidebar. It tells the agent to prefer concise responses and summarize redundant context, reducing token usage on every interaction.
+
+## Proxy server
+
+For deeper integration, run bref as a local proxy between your agent and the LLM API:
+
+```bash
+pip install -e ".[dev]"
+python -m bref.proxy --port 8090 --upstream https://api.anthropic.com
+```
+
+Then configure your agent to send requests to `http://localhost:8090` instead of the API directly. The proxy compresses prompts, caches responses, and routes to cheaper models when possible.
+
 ## VS Code / Kiro extension
 
 The extension lives in `vscode-bref/`. It calls into the Python library, so you need bref installed in a Python environment first.
