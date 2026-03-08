@@ -1,0 +1,73 @@
+{
+  "name": "vscode-bref",
+  "displayName": "Bref",
+  "description": "Token cost reduction for LLM API calls",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "bref.compressSelection",
+        "title": "Bref: Compress Selection"
+      },
+      {
+        "command": "bref.showStats",
+        "title": "Bref: Show Stats"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "bref",
+          "title": "Bref",
+          "icon": "$(dashboard)"
+        }
+      ]
+    },
+    "views": {
+      "bref": [
+        {
+          "id": "bref.statsView",
+          "name": "Stats",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Bref",
+      "properties": {
+        "bref.compressionRatio": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0.1,
+          "maximum": 1,
+          "description": "Target compression ratio (0.1 = aggressive, 1.0 = no compression)"
+        },
+        "bref.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to Python interpreter with bref installed"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}
