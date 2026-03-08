@@ -1,8 +1,15 @@
 import * as vscode from "vscode";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+const STATS_FILE = path.join(os.homedir(), ".bref", "stats.json");
 
 export interface SessionStats {
   totalTokensSaved: number;
   totalCompressions: number;
+  totalTokensOriginal: number;
+  totalTokensCompressed: number;
   history: Array<{
     timestamp: number;
     tokensSaved: number;
@@ -10,27 +17,47 @@ export interface SessionStats {
   }>;
 }
 
+interface PersistentStats {
+  total_tokens_saved: number;
+  total_compressions: number;
+  total_tokens_original: number;
+  total_tokens_compressed: number;
+  history: Array<{
+    tokens_saved: number;
+    effective_ratio: number;
+    sentences_dropped: number;
+    ngram_dedup_count: number;
+  }>;
+}
+
 export class StatsViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = "bref.statsView";
   private _view?: vscode.WebviewView;
-  private _stats: SessionStats = {
+  private _sessionStats: SessionStats = {
     totalTokensSaved: 0,
     totalCompressions: 0,
+    totalTokensOriginal: 0,
+    totalTokensCompressed: 0,
     history: [],
   };
+  private _watcher?: vscode.FileSystemWatcher;
+  private _pollTimer?: NodeJS.Timeout;
 
-  constructor(private readonly _extensionUri: vscode.Uri) {}
+  constructor(private readonly _extensionUri: vscode.Uri) {
+    // Poll the stats file every 5 seconds for updates from the Python side
+    this._pollTimer = setInterval(() => this._refreshFromDisk(), 5000);
+  }
 
   resolveWebviewView(webviewView: vscode.WebviewView): void {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true };
-    this._updateHtml();
+    this._refreshFromDisk();
   }
 
   recordCompression(tokensSaved: number, ratio: number): void {
-    this._stats.totalTokensSaved += tokensSaved;
-    this._stats.totalCompressions += 1;
-    this._stats.history.push({
+    this._sessionStats.totalTokensSaved += tokensSaved;
+    this._sessionStats.totalCompressions += 1;
+    this._sessionStats.history.push({
       timestamp: Date.now(),
       tokensSaved,
       ratio,
@@ -39,7 +66,35 @@ export class StatsViewProvider implements vscode.WebviewViewProvider {
   }
 
   get stats(): SessionStats {
-    return this._stats;
+    return this._sessionStats;
+  }
+
+  dispose(): void {
+    if (this._watcher) {
+      this._watcher.dispose();
+    }
+    if (this._pollTimer) {
+      clearInterval(this._pollTimer);
+    }
+  }
+
+  private _refreshFromDisk(): void {
+    try {
+      if (!fs.existsSync(STATS_FILE)) {
+        return;
+      }
+      const raw = fs.readFileSync(STATS_FILE, "utf-8");
+      const persistent: PersistentStats = JSON.parse(raw);
+
+      this._sessionStats.totalTokensSaved = persistent.total_tokens_saved;
+      this._sessionStats.totalCompressions = persistent.total_compressions;
+      this._sessionStats.totalTokensOriginal = persistent.total_tokens_original;
+      this._sessionStats.totalTokensCompressed = persistent.total_tokens_compressed;
+
+      this._updateHtml();
+    } catch {
+      // stats file might be mid-write, ignore
+    }
   }
 
   private _updateHtml(): void {
@@ -47,13 +102,16 @@ export class StatsViewProvider implements vscode.WebviewViewProvider {
       return;
     }
 
+    const s = this._sessionStats;
     const avgRatio =
-      this._stats.history.length > 0
-        ? (
-            this._stats.history.reduce((s, h) => s + h.ratio, 0) /
-            this._stats.history.length
-          ).toFixed(2)
+      s.totalTokensOriginal > 0
+        ? (s.totalTokensCompressed / s.totalTokensOriginal).toFixed(2)
         : "N/A";
+
+    const savedPct =
+      s.totalTokensOriginal > 0
+        ? ((s.totalTokensSaved / s.totalTokensOriginal) * 100).toFixed(1)
+        : "0";
 
     this._view.webview.html = `<!DOCTYPE html>
 <html>
@@ -63,38 +121,29 @@ export class StatsViewProvider implements vscode.WebviewViewProvider {
     .stat { margin-bottom: 12px; }
     .label { font-size: 11px; opacity: 0.7; }
     .value { font-size: 20px; font-weight: 600; }
+    .sub { font-size: 11px; opacity: 0.5; margin-top: 2px; }
     table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
     th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--vscode-widget-border); }
   </style>
 </head>
 <body>
   <div class="stat">
-    <div class="label">Tokens saved (session)</div>
-    <div class="value">${this._stats.totalTokensSaved.toLocaleString()}</div>
+    <div class="label">Tokens saved (all time)</div>
+    <div class="value">${s.totalTokensSaved.toLocaleString()}</div>
+    <div class="sub">${savedPct}% reduction</div>
   </div>
   <div class="stat">
     <div class="label">Compressions run</div>
-    <div class="value">${this._stats.totalCompressions}</div>
+    <div class="value">${s.totalCompressions}</div>
   </div>
   <div class="stat">
     <div class="label">Avg compression ratio</div>
     <div class="value">${avgRatio}</div>
   </div>
-  ${
-    this._stats.history.length > 0
-      ? `<table>
-    <tr><th>Time</th><th>Saved</th><th>Ratio</th></tr>
-    ${this._stats.history
-      .slice(-10)
-      .reverse()
-      .map(
-        (h) =>
-          `<tr><td>${new Date(h.timestamp).toLocaleTimeString()}</td><td>${h.tokensSaved}</td><td>${h.ratio.toFixed(2)}</td></tr>`
-      )
-      .join("")}
-  </table>`
-      : ""
-  }
+  <div class="stat">
+    <div class="label">Tokens processed</div>
+    <div class="value">${s.totalTokensOriginal.toLocaleString()}</div>
+  </div>
 </body>
 </html>`;
   }
