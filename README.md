@@ -41,11 +41,15 @@ result = bref.optimize(
 
 The extension lives in `vscode-bref/`. It calls into the Python library, so you need bref installed in a Python environment first.
 
-### Setup
+### Quick install
 
-1. Install the Python library (see above).
+[Download bref-0.1.0.vsix](https://github.com/alivcor/bref/raw/main/vscode-bref/bref-0.1.0.vsix), then in VS Code or Kiro:
 
-2. Build the extension:
+1. Open the command palette (`Cmd+Shift+P`)
+2. Run "Extensions: Install from VSIX..."
+3. Select the downloaded `.vsix` file
+
+### Build from source
 
 ```bash
 cd vscode-bref
