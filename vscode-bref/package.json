@@ -2,7 +2,7 @@
   "name": "vscode-bref",
   "displayName": "Bref",
   "description": "Token cost reduction for LLM API calls",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "engines": {
     "vscode": "^1.85.0"
   },

@@ -48,6 +48,7 @@ export class StatsViewProvider implements vscode.WebviewViewProvider {
   };
   private _activityLog: LogEntry[] = [];
   private _pollTimer?: NodeJS.Timeout;
+  private _steeringLogged = false;
 
   constructor(private readonly _extensionUri: vscode.Uri) {
     this._pollTimer = setInterval(() => this._refreshFromDisk(), 5000);
@@ -122,7 +123,10 @@ export class StatsViewProvider implements vscode.WebviewViewProvider {
       ratio: 0.75,
     });
     this._persistToDisk();
-    this.addLog("Bref steering active on prompt", "steering");
+    if (!this._steeringLogged) {
+      this._steeringLogged = true;
+      this.addLog("Bref steering active on prompt", "steering");
+    }
   }
 
   private _persistToDisk(): void {
