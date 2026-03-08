@@ -87,23 +87,22 @@ async function recordPromptCompression(text?: string): Promise<void> {
 }
 
 /**
- * Watches the activity log file that the bref-stats-track hook writes to
- * on every prompt submission. Also watches steering and hook files.
+ * Watches the activity log file that the bref-stats-track hook touches
+ * on every prompt submission. Detects mtime changes to trigger stats
+ * updates. Also watches steering and hook files.
  */
 function watchPromptActivity(context: vscode.ExtensionContext): void {
-  // Watch ~/.bref/activity.log for new entries from the hook
-  let lastLineCount = 0;
+  let lastMtime = 0;
   try {
     const dir = path.dirname(ACTIVITY_LOG);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
     if (fs.existsSync(ACTIVITY_LOG)) {
-      const content = fs.readFileSync(ACTIVITY_LOG, "utf-8");
-      lastLineCount = content.split("\n").filter(Boolean).length;
+      lastMtime = fs.statSync(ACTIVITY_LOG).mtimeMs;
     }
   } catch {
-    // fine, will start from zero
+    // will start from zero
   }
 
   const activityPoll = setInterval(() => {
@@ -111,15 +110,11 @@ function watchPromptActivity(context: vscode.ExtensionContext): void {
       if (!fs.existsSync(ACTIVITY_LOG)) {
         return;
       }
-      const content = fs.readFileSync(ACTIVITY_LOG, "utf-8");
-      const lines = content.split("\n").filter(Boolean);
-      const newCount = lines.length;
-      if (newCount > lastLineCount) {
-        const newLines = lines.slice(lastLineCount);
-        for (const line of newLines) {
-          statsProvider.recordSteeringActive();
-        }
-        lastLineCount = newCount;
+      const mtime = fs.statSync(ACTIVITY_LOG).mtimeMs;
+      if (mtime > lastMtime) {
+        lastMtime = mtime;
+        statsProvider.recordSteeringActive();
+        sessionTokensSaved = statsProvider.stats.totalTokensSaved;
         updateStatusBar();
       }
     } catch {

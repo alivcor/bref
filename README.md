@@ -71,6 +71,17 @@ Open Settings and search for "Bref":
 
 The status bar shows a running total. The sidebar panel under the Bref icon shows cumulative stats read from `~/.bref/stats.json`.
 
+### How stats tracking works
+
+The extension creates two hooks on activation:
+
+- `bref-compress-prompt` (askAgent): injects the compression steering into every prompt
+- `bref-stats-track` (runCommand): silently touches `~/.bref/activity.log` so the extension can detect prompt submissions
+
+The extension polls `activity.log` for mtime changes every 2 seconds. When a new prompt is detected, it records the activity and persists updated stats to `~/.bref/stats.json`. The sidebar panel and status bar update automatically.
+
+If you're upgrading from an earlier version, the extension overwrites the stats-track hook on activation to replace the old `mkdir` + `echo` command (which was noisy) with a silent `touch`.
+
 ## Proxy server
 
 For deeper integration, run bref as a local HTTP proxy between your agent and the LLM API:
